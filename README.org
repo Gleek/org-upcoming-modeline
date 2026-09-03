@@ -5,6 +5,20 @@
 
 This package shows you the next upcoming org appointment in your modeline.
 
+* Note on this fork
+
+Fork of [[https://github.com/unhammer/org-upcoming-modeline][unhammer/org-upcoming-modeline]]. Changes on top of upstream:
+
+- =org-upcoming-modeline-show-running= (off by default): count down the end
+  of the time-block you are currently inside, and switch to the next one
+  =org-upcoming-modeline-switch-ahead= seconds before it ends. See
+  [[#configuration][Configuration]] below.
+- The default format is padded on both sides, so it no longer runs into its
+  neighbours in =global-mode-string= (the org clock, for one).
+
+Both are meant to go upstream; not proposed there yet.
+
+
 You can left-click on it to go to it, right-click for a menu of
 actions, middle-click to temporarily hide it.
 
@@ -52,9 +66,25 @@ Here is a non-exhaustive list of some =org-upcoming-modeline= functionalities:
   #+end_src
 - =org-upcoming-modeline-trim= allows you to fix the number of characters displayed for the appointment title (=heading=), it is 20 by default.
   Exemple removing the trimming:
-  #+begin_src emacs-lisp 
+  #+begin_src emacs-lisp
     (setq org-upcoming-modeline-trim nil)
   #+end_src
+- =org-upcoming-modeline-show-running= makes the modeline count down the
+  /end/ of the event you are currently inside, rather than jumping straight
+  to the next one. It only applies to events with a same-day time range,
+  like =<2024-05-05 Sun 10:00-11:30>=. When less than
+  =org-upcoming-modeline-switch-ahead= seconds (15 minutes by default) are
+  left of the running event, the modeline switches to the next one, so you
+  get a heads-up before the handover. A running event is shown with =▶=
+  instead of =⏰=; =org-upcoming-modeline-running-p= tells a custom
+  =org-upcoming-modeline-format= function which of the two it is rendering.
+  #+begin_src emacs-lisp
+    (setq org-upcoming-modeline-show-running t
+          org-upcoming-modeline-switch-ahead (* 10 60))
+  #+end_src
+  Off by default. Running events are looked for up to
+  =org-upcoming-modeline-lookback= seconds back (8 hours), so events longer
+  than that are not detected.
 
 * Related packages
 

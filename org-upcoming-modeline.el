@@ -101,6 +101,29 @@ No trimming if set to nil."
   :group 'org-upcoming-modeline
   :type 'integer)
 
+(defcustom org-upcoming-modeline-show-running nil
+  "Whether to count down the end of the event that is currently running.
+An event is running if it has a timestamp with a time range (like
+<2024-05-05 Sun 10:00-11:30>) that contains the current time.  While
+one is running, the mode line shows the time left of it instead of the
+next upcoming event, until less than
+`org-upcoming-modeline-switch-ahead' seconds are left."
+  :group 'org-upcoming-modeline
+  :type 'boolean)
+
+(defcustom org-upcoming-modeline-switch-ahead (* 15 60)
+  "Switch from the running event to the next one this many seconds before it ends.
+Only used when `org-upcoming-modeline-show-running' is non-nil."
+  :group 'org-upcoming-modeline
+  :type 'integer)
+
+(defcustom org-upcoming-modeline-lookback (* 8 3600)
+  "How many seconds back to look for an event that is still running.
+Events longer than this are not found.  Only used when
+`org-upcoming-modeline-show-running' is non-nil."
+  :group 'org-upcoming-modeline
+  :type 'integer)
+
 (defcustom org-upcoming-modeline-ignored-keywords nil
   "Which keywords to ignores (e.g. DONE)."
   :group 'org-upcoming-modeline
@@ -141,6 +164,10 @@ Used by `org-upcoming-modeline-snooze'."
 
 (defvar org-upcoming-modeline--current-event nil
   "Value from last `org-upcoming-modeline--find-upcoming'.")
+
+(defvar org-upcoming-modeline-running-p nil
+  "Non-nil when the displayed event is running, i.e. we count down its end.
+Functions set as `org-upcoming-modeline-format' may consult this.")
 
 (defvar org-upcoming-modeline--find-event-timer nil)
 (defvar org-upcoming-modeline--set-string-timer nil)
@@ -217,7 +244,9 @@ Sets `org-upcoming-modeline-string' based on
                    'face (if (<= 0 seconds-until org-upcoming-modeline-soon)
                              'org-upcoming-modeline-soon-face
                            'org-upcoming-modeline-normal-face)
-                   'help-echo (format "%s left until %s (mouse-1: goto, mouse-2: snooze, mouse-3: menu)"
+                   'help-echo (format (if org-upcoming-modeline-running-p
+                                          "%s left of %s (mouse-1: goto, mouse-2: snooze, mouse-3: menu)"
+                                        "%s left until %s (mouse-1: goto, mouse-2: snooze, mouse-3: menu)")
                                       (ts-human-format-duration seconds-until)
                                       heading)
                    'org-upcoming-marker marker
@@ -226,22 +255,73 @@ Sets `org-upcoming-modeline-string' based on
 
 (defun org-upcoming-modeline-default-format (time-string heading)
   "Format TIME-STRING and HEADING as a string for displaying in the mode-line.
-Used as default for `org-upcoming-modeline-format'."
-  (format " ⏰ %s: %s" time-string heading))
+Used as default for `org-upcoming-modeline-format'.  Padded on both
+sides, since neighbours in `global-mode-string' (like the org clock)
+bring no padding of their own."
+  (format " %s %s: %s "
+          (if org-upcoming-modeline-running-p "▶" "⏰")
+          time-string
+          heading))
+
+(defun org-upcoming-modeline--range-end (org-ts-string start)
+  "End of ORG-TS-STRING as a ts struct, given its parsed START.
+Nil unless ORG-TS-STRING holds a same-day time range."
+  (save-match-data
+    (when (string-match "[0-9]\\{1,2\\}:[0-9]\\{2\\}-\\([0-9]\\{1,2\\}\\):\\([0-9]\\{2\\}\\)"
+                        org-ts-string)
+      (ts-apply :hour (string-to-number (match-string 1 org-ts-string))
+                :minute (string-to-number (match-string 2 org-ts-string))
+                :second 0
+                start))))
+
+(defun org-upcoming-modeline--pick (items now)
+  "Pick the event to display from ITEMS, a list of (START END MARKER).
+NOW should be `ts-now'.  Returns (TIME MARKER RUNNING-P), where TIME is
+the end of the running event if we picked one, else the start of the
+next event.  See `org-upcoming-modeline-show-running'."
+  (let ((items (seq-sort-by #'car #'ts< items)))
+    (if (not org-upcoming-modeline-show-running)
+        (when-let* ((first (car items)))
+          (list (nth 0 first) (nth 2 first) nil))
+      (let* ((running (car (last (seq-filter (lambda (i)
+                                               (pcase-let ((`(,start ,end ,_) i))
+                                                 (and end (ts<= start now) (ts< now end))))
+                                             items))))
+             ;; Events without a range still show for `keep-late' after starting:
+             (late (seq-find (lambda (i)
+                               (pcase-let ((`(,start ,end ,_) i))
+                                 (and (null end)
+                                      (ts<= start now)
+                                      (< (ts-difference now start)
+                                         org-upcoming-modeline-keep-late))))
+                             items))
+             (next (seq-find (lambda (i) (ts< now (car i))) items)))
+        (cond ((and running
+                    (or (null next)
+                        (> (ts-difference (nth 1 running) now)
+                           org-upcoming-modeline-switch-ahead)))
+               (list (nth 1 running) (nth 2 running) t))
+              (late (list (nth 0 late) (nth 2 late) nil))
+              (next (list (nth 0 next) (nth 2 next) nil)))))))
 
 (defun org-upcoming-modeline--find-event ()
-  "Find the first upcoming org event, with timestamp and marker.
-Store it in `org-upcoming-modeline--current-event'.
+  "Find the org event to show, with timestamp and marker.
+Store it in `org-upcoming-modeline--current-event'.  That is the next
+upcoming event, or, with `org-upcoming-modeline-show-running', the one
+currently running.
 
 Does nothing if `org-agenda-files' is nil."
   (setq
    org-upcoming-modeline--current-event
    (when-let*
        ((org-files (org-agenda-files))
-        (start-time (ts-adjust 'second (- org-upcoming-modeline-keep-late)
-                               (ts-now)))
+        (now (ts-now))
+        (start-time (ts-adjust 'second (- (if org-upcoming-modeline-show-running
+                                              org-upcoming-modeline-lookback
+                                            org-upcoming-modeline-keep-late))
+                               now))
         (end-time (ts-adjust 'day org-upcoming-modeline-days-ahead
-                             (ts-now)))
+                             now))
         (items (remove
                 nil
                 (org-ql-select org-files
@@ -256,7 +336,7 @@ Does nothing if `org-agenda-files' is nil."
                   :action `(when-let* ((mark (point-marker))
                                        (from-day (time-to-days (current-time)))
                                        (bound (save-excursion (outline-next-heading) (point)))
-                                       (time (save-excursion
+                                       (span (save-excursion
                                                (car
                                                 (sort (cl-loop while (re-search-forward org-tsr-regexp bound 'noerror)
                                                                for org-ts-string = (match-string 1)
@@ -266,14 +346,18 @@ Does nothing if `org-agenda-files' is nil."
                                                                                                                  #'org-upcoming-modeline--parse-ts)
                                                                when (and time
                                                                          (ts<= ,start-time time))
-                                                               collect time)
-                                                      #'ts<)))))
-                             (list time mark))))))
+                                                               collect (list time
+                                                                             (org-upcoming-modeline--range-end org-ts-string time)))
+                                                      (lambda (a b) (ts< (car a) (car b))))))))
+                             (append span (list mark)))))))
      (pcase-let*
-         ((`(,time ,marker . nil) (car (seq-sort-by #'car #'ts< items)))
-          (heading (org-with-point-at marker
-                     (org-link-display-format (nth 4 (org-heading-components))))))
-       (list time heading marker)))))
+         ((`(,time ,marker ,running-p) (org-upcoming-modeline--pick items now))
+          (heading (and marker
+                        (org-with-point-at marker
+                          (org-link-display-format (nth 4 (org-heading-components)))))))
+       (setq org-upcoming-modeline-running-p running-p)
+       (when marker
+         (list time heading marker))))))
 
 
 (defun org-upcoming-modeline-ts-to-time (ts)
