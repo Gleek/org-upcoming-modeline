@@ -10,9 +10,12 @@ This package shows you the next upcoming org appointment in your modeline.
 Fork of [[https://github.com/unhammer/org-upcoming-modeline][unhammer/org-upcoming-modeline]]. Changes on top of upstream:
 
 - =org-upcoming-modeline-show-running= (on by default here): count down the
-  end of the time-block you are currently inside, and switch to the next one
-  =org-upcoming-modeline-switch-ahead= seconds before it ends. Set it to nil
-  for the upstream behaviour of always showing the next event. See
+  end of the time-block you are currently inside, instead of always
+  showing the next event. Handover to the next block is based on how
+  close /its/ start is (within =org-upcoming-modeline-switch-ahead=
+  seconds), not on how much is left of the current one -- so a gap
+  between blocks shows nothing rather than a stale countdown. Set it to
+  nil for the upstream behaviour of always showing the next event. See
   [[#configuration][Configuration]] below.
 - =org-upcoming-modeline-show-seconds= (nil by default here): durations are
   shown as "1m" rather than "1m30s", so the mode line stops twitching
@@ -20,8 +23,8 @@ Fork of [[https://github.com/unhammer/org-upcoming-modeline][unhammer/org-upcomi
 - The default format is padded on both sides, so it no longer runs into its
   neighbours in =global-mode-string= (the org clock, for one).
 
-Both are meant to go upstream; not proposed there yet. Until then, install
-from here instead of MELPA:
+None of this is proposed upstream yet. Until then, install from here
+instead of MELPA:
 
 #+begin_src emacs-lisp
   ;; elpaca
@@ -98,14 +101,23 @@ Here is a non-exhaustive list of some =org-upcoming-modeline= functionalities:
 - =org-upcoming-modeline-show-running= makes the modeline count down the
   /end/ of the event you are currently inside, rather than jumping straight
   to the next one. It only applies to events with a same-day time range,
-  like =<2024-05-05 Sun 10:00-11:30>=. When less than
-  =org-upcoming-modeline-switch-ahead= seconds (15 minutes by default) are
-  left of the running event, the modeline switches to the next one, so you
-  get a heads-up before the handover. A running event is shown with =▶=
+  like =<2024-05-05 Sun 10:00-11:30>=. A running event is shown with =▶=
   instead of =⏰=; =org-upcoming-modeline-running-p= tells a custom
   =org-upcoming-modeline-format= function which of the two it is rendering.
+
+  The handover to the next event is driven by how close /that event's
+  start/ is, not by how much is left of the running one:
+  - Inside an event, and the next one is more than
+    =org-upcoming-modeline-switch-ahead= seconds away (15 minutes by
+    default): show the running event, counting down to its end.
+  - The next event's start is within that many seconds, whether or not
+    something is currently running: show the next event.
+  - Nothing running, and the next event is further away than that: show
+    nothing. In particular, a gap between two events longer than
+    =switch-ahead= means a blank modeline in between, rather than either
+    event.
   #+begin_src emacs-lisp
-    (setq org-upcoming-modeline-switch-ahead (* 10 60)) ; hand over 10 min before the end
+    (setq org-upcoming-modeline-switch-ahead (* 10 60)) ; hand over 10 min out, not 15
     (setq org-upcoming-modeline-show-running nil)       ; or turn the whole thing off
   #+end_src
   On by default in this fork. Running events are looked for up to

@@ -112,18 +112,25 @@ No trimming if set to nil."
 (defcustom org-upcoming-modeline-show-running t
   "Whether to count down the end of the event that is currently running.
 An event is running if it has a timestamp with a time range (like
-<2024-05-05 Sun 10:00-11:30>) that contains the current time.  While
-one is running, the mode line shows the time left of it instead of the
-next upcoming event, until less than
-`org-upcoming-modeline-switch-ahead' seconds are left.
+<2024-05-05 Sun 10:00-11:30>) that contains the current time.  While one
+is running, the mode line shows the time left of it instead of the next
+upcoming event, until the next event's start comes within
+`org-upcoming-modeline-switch-ahead' seconds -- at which point the mode
+line switches to showing that next event, even if the running one has
+not ended yet.  If no event is running and the next one is further away
+than that, the mode line shows nothing.
 
-Set to nil to always show the next upcoming event."
+Set to nil to always show the next upcoming event, however far away."
   :group 'org-upcoming-modeline
   :type 'boolean)
 
 (defcustom org-upcoming-modeline-switch-ahead (* 15 60)
-  "Switch from the running event to the next one this many seconds before it ends.
-Only used when `org-upcoming-modeline-show-running' is non-nil."
+  "Only show the next event once its start is this many seconds away.
+Also governs handover away from the running event, if any: as soon as
+the next event's start is this close, the mode line shows the next
+event instead, even if the running one has not ended.  A gap between
+events longer than this means nothing is shown in between.  Only used
+when `org-upcoming-modeline-show-running' is non-nil."
   :group 'org-upcoming-modeline
   :type 'integer)
 
@@ -313,14 +320,16 @@ next event.  See `org-upcoming-modeline-show-running'."
                                       (< (ts-difference now start)
                                          org-upcoming-modeline-keep-late))))
                              items))
-             (next (seq-find (lambda (i) (ts< now (car i))) items)))
-        (cond ((and running
-                    (or (null next)
-                        (> (ts-difference (nth 1 running) now)
-                           org-upcoming-modeline-switch-ahead)))
-               (list (nth 1 running) (nth 2 running) t))
-              (late (list (nth 0 late) (nth 2 late) nil))
-              (next (list (nth 0 next) (nth 2 next) nil)))))))
+             (next (seq-find (lambda (i) (ts< now (car i))) items))
+             ;; Hand over as soon as the *next* event is close, regardless of
+             ;; how much of the running one (if any) is left -- so a gap
+             ;; between events doesn't cause an early switch, and a close
+             ;; next event pre-empts the running one even with no gap:
+             (next-close (and next (<= (ts-difference (car next) now)
+                                       org-upcoming-modeline-switch-ahead))))
+        (cond (next-close (list (nth 0 next) (nth 2 next) nil))
+              (running (list (nth 1 running) (nth 2 running) t))
+              (late (list (nth 0 late) (nth 2 late) nil)))))))
 
 (defun org-upcoming-modeline--find-event ()
   "Find the org event to show, with timestamp and marker.

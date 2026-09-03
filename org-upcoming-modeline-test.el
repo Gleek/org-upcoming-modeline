@@ -137,8 +137,33 @@ That is (TIME-STRING MARKER RUNNING-P), or nil if nothing was picked."
     (should (equal (funcall at 12 25) '("12:30" 11 t)))
     ;; All over.
     (should-not (funcall at 13 0))
-    ;; Before everything: the next one, as usual.
-    (should (equal (funcall at 9 0) '("10:00" 10 nil)))))
+    ;; Before everything, and further away than switch-ahead: nothing yet.
+    (should-not (funcall at 9 0))
+    ;; Within switch-ahead of the first one: show it.
+    (should (equal (funcall at 9 50) '("10:00" 10 nil)))))
+
+(ert-deftest org-upcoming-modeline-pick-gap-between-events ()
+  "A gap between events longer than `switch-ahead' should not cause an
+early switch away from the running event, nor show the next one too
+soon; only the *next event's own* proximity decides the handover."
+  (let* ((org-upcoming-modeline-show-running t)
+         (org-upcoming-modeline-switch-ahead (* 15 60))
+         (org-upcoming-modeline-keep-late 900)
+         ;; A: 9:00-10:00, gap, B: 11:00-11:30
+         (items (list (org-upcoming-modeline-test--span 9 0 10 0)
+                      (org-upcoming-modeline-test--span 11 0 11 30)))
+         (at (lambda (h m) (org-upcoming-modeline-test--pick items h m))))
+    ;; Inside A, B still an hour away: show A, not B, not nothing.
+    (should (equal (funcall at 9 30) '("10:00" 9 t)))
+    ;; Still inside A, close to its end, but B is still far off: keep
+    ;; showing A running rather than switching early or going blank.
+    (should (equal (funcall at 9 50) '("10:00" 9 t)))
+    ;; A just ended, B still far off: nothing, not a stale A.
+    (should-not (funcall at 10 5))
+    ;; Within switch-ahead of B's start: show B, even though nothing running.
+    (should (equal (funcall at 10 50) '("11:00" 11 nil)))
+    ;; Inside B, nothing next: show B running.
+    (should (equal (funcall at 11 15) '("11:30" 11 t)))))
 
 (ert-deftest org-upcoming-modeline-pick-running-no-range ()
   "Events without a time range are never \"running\", but do get `keep-late'."
