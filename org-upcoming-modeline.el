@@ -101,13 +101,15 @@ No trimming if set to nil."
   :group 'org-upcoming-modeline
   :type 'integer)
 
-(defcustom org-upcoming-modeline-show-running nil
+(defcustom org-upcoming-modeline-show-running t
   "Whether to count down the end of the event that is currently running.
 An event is running if it has a timestamp with a time range (like
 <2024-05-05 Sun 10:00-11:30>) that contains the current time.  While
 one is running, the mode line shows the time left of it instead of the
 next upcoming event, until less than
-`org-upcoming-modeline-switch-ahead' seconds are left."
+`org-upcoming-modeline-switch-ahead' seconds are left.
+
+Set to nil to always show the next upcoming event."
   :group 'org-upcoming-modeline
   :type 'boolean)
 

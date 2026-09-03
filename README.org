@@ -9,9 +9,10 @@ This package shows you the next upcoming org appointment in your modeline.
 
 Fork of [[https://github.com/unhammer/org-upcoming-modeline][unhammer/org-upcoming-modeline]]. Changes on top of upstream:
 
-- =org-upcoming-modeline-show-running= (off by default): count down the end
-  of the time-block you are currently inside, and switch to the next one
-  =org-upcoming-modeline-switch-ahead= seconds before it ends. See
+- =org-upcoming-modeline-show-running= (on by default here): count down the
+  end of the time-block you are currently inside, and switch to the next one
+  =org-upcoming-modeline-switch-ahead= seconds before it ends. Set it to nil
+  for the upstream behaviour of always showing the next event. See
   [[#configuration][Configuration]] below.
 - The default format is padded on both sides, so it no longer runs into its
   neighbours in =global-mode-string= (the org clock, for one).
@@ -24,14 +25,12 @@ from here instead of MELPA:
   (use-package org-upcoming-modeline
     :ensure (:fetcher github :repo "Gleek/org-upcoming-modeline")
     :config
-    (setopt org-upcoming-modeline-show-running t)
     (org-upcoming-modeline-mode))
 
   ;; straight.el
   (use-package org-upcoming-modeline
     :straight (org-upcoming-modeline :host github :repo "Gleek/org-upcoming-modeline")
     :config
-    (setopt org-upcoming-modeline-show-running t)
     (org-upcoming-modeline-mode))
 #+end_src
 
@@ -96,10 +95,10 @@ Here is a non-exhaustive list of some =org-upcoming-modeline= functionalities:
   instead of =⏰=; =org-upcoming-modeline-running-p= tells a custom
   =org-upcoming-modeline-format= function which of the two it is rendering.
   #+begin_src emacs-lisp
-    (setq org-upcoming-modeline-show-running t
-          org-upcoming-modeline-switch-ahead (* 10 60))
+    (setq org-upcoming-modeline-switch-ahead (* 10 60)) ; hand over 10 min before the end
+    (setq org-upcoming-modeline-show-running nil)       ; or turn the whole thing off
   #+end_src
-  Off by default. Running events are looked for up to
+  On by default in this fork. Running events are looked for up to
   =org-upcoming-modeline-lookback= seconds back (8 hours), so events longer
   than that are not detected.
 
