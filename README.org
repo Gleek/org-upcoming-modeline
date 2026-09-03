@@ -16,7 +16,24 @@ Fork of [[https://github.com/unhammer/org-upcoming-modeline][unhammer/org-upcomi
 - The default format is padded on both sides, so it no longer runs into its
   neighbours in =global-mode-string= (the org clock, for one).
 
-Both are meant to go upstream; not proposed there yet.
+Both are meant to go upstream; not proposed there yet. Until then, install
+from here instead of MELPA:
+
+#+begin_src emacs-lisp
+  ;; elpaca
+  (use-package org-upcoming-modeline
+    :ensure (:fetcher github :repo "Gleek/org-upcoming-modeline")
+    :config
+    (setopt org-upcoming-modeline-show-running t)
+    (org-upcoming-modeline-mode))
+
+  ;; straight.el
+  (use-package org-upcoming-modeline
+    :straight (org-upcoming-modeline :host github :repo "Gleek/org-upcoming-modeline")
+    :config
+    (setopt org-upcoming-modeline-show-running t)
+    (org-upcoming-modeline-mode))
+#+end_src
 
 
 You can left-click on it to go to it, right-click for a menu of
