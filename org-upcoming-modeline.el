@@ -64,6 +64,14 @@ Returns nil if no hour/minute part."
   :group 'org-upcoming-modeline
   :type 'integer)
 
+(defcustom org-upcoming-modeline-show-seconds nil
+  "Whether durations in the mode line include the seconds part.
+With nil, \"1m30s\" is shown as \"1m\", so the mode line stops twitching
+every five seconds.  Durations under a minute still show seconds, there
+being nothing else to show."
+  :group 'org-upcoming-modeline
+  :type 'boolean)
+
 (defcustom org-upcoming-modeline-keep-late 900
   "Show this many seconds after the event has begun, unless we're clocked into it."
   :group 'org-upcoming-modeline
@@ -205,15 +213,23 @@ Ignores any TZ/DST info."
   (- (time-to-days (org-upcoming-modeline--encode-ts d1))
      (time-to-days (org-upcoming-modeline--encode-ts d2))))
 
+(defun org-upcoming-modeline--format-duration (seconds)
+  "Abbreviated duration of SECONDS, honouring `org-upcoming-modeline-show-seconds'."
+  (let ((s (ts-human-format-duration seconds 'abbreviate)))
+    (if org-upcoming-modeline-show-seconds
+        s
+      ;; Drop the seconds, unless that is all we have:
+      (replace-regexp-in-string "\\([a-z]\\)[0-9]+s\\'" "\\1" s))))
+
 (defun org-upcoming-modeline--format-ts (time now)
   "Human readable description of time left until TIME for display in mode-line.
 NOW should be `ts-now' (an argument for ease of testing)."
   (let* ((seconds-until (ts-difference time now))
          (days-until (org-upcoming-modeline--days-between time now)))
     (cond ((ts< time now)
-           (concat "-" (ts-human-format-duration (- seconds-until) 'abbreviate)))
+           (concat "-" (org-upcoming-modeline--format-duration (- seconds-until))))
           ((<= seconds-until org-upcoming-modeline-duration-threshold) ; "1m32s"
-           (ts-human-format-duration seconds-until 'abbreviate))
+           (org-upcoming-modeline--format-duration seconds-until))
           ((= days-until 0)             ; "7:45"
            (ts-format "%H:%M" time))
           ((= days-until 1)             ; "tomorrow 7:45"

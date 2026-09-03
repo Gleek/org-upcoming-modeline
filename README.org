@@ -14,6 +14,9 @@ Fork of [[https://github.com/unhammer/org-upcoming-modeline][unhammer/org-upcomi
   =org-upcoming-modeline-switch-ahead= seconds before it ends. Set it to nil
   for the upstream behaviour of always showing the next event. See
   [[#configuration][Configuration]] below.
+- =org-upcoming-modeline-show-seconds= (nil by default here): durations are
+  shown as "1m" rather than "1m30s", so the mode line stops twitching
+  every few seconds. Set it to t for the upstream behaviour.
 - The default format is padded on both sides, so it no longer runs into its
   neighbours in =global-mode-string= (the org clock, for one).
 
@@ -74,6 +77,13 @@ Here is a non-exhaustive list of some =org-upcoming-modeline= functionalities:
   Example replacing the alarm clock icon with a calendar icon, and replacing =:= with =-=:
   #+begin_src emacs-lisp 
     (setq org-upcoming-modeline-format (lambda (ms mh) (format "🗓 %s - %s" ms mh)))
+  #+end_src
+- =org-upcoming-modeline-show-seconds= controls whether durations keep their
+  seconds part. Nil (the default in this fork) turns "1m30s" into "1m";
+  durations under a minute still show seconds, there being nothing else to
+  show. The tooltip always spells the duration out in full.
+  #+begin_src emacs-lisp
+    (setq org-upcoming-modeline-show-seconds t) ; upstream behaviour
   #+end_src
 - =org-upcoming-modeline-days-ahead= allows you to fix the number of days to look into the future (1 by default).
   Example looking for 15 days ahead:

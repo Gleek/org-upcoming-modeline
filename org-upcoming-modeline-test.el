@@ -25,6 +25,7 @@
   (let* ((org-upcoming-modeline-l10n '((tomorrow . "tomorrow")))
          (system-time-locale "C.UTF-8")
          (org-upcoming-modeline-duration-threshold 3600)
+         (org-upcoming-modeline-show-seconds t)
          (now       (make-ts :hour 10 :minute 0 :second 0 :day 1 :month 1 :year 2000))
          (past90s   (ts-adjust 'second (- 90) now))
          (in90s     (ts-adjust 'second 90 now))
@@ -53,6 +54,7 @@
   (let* ((org-upcoming-modeline-l10n '((tomorrow . "tomorrow")))
          (system-time-locale "C.UTF-8")
          (org-upcoming-modeline-duration-threshold 3600)
+         (org-upcoming-modeline-show-seconds t)
          (now       (make-ts :hour 10 :minute 0 :second 0 :day 31 :month 12 :year 1999))
          (past90s   (ts-adjust 'second (- 90) now))
          (in90s     (ts-adjust 'second 90 now))
@@ -76,6 +78,22 @@
     (should (equal (org-upcoming-modeline--format-ts  in28days now)  "28 Jan 10:00"))
     (should (equal (org-upcoming-modeline--format-ts  in60days now)  "29 Feb 10:00"))
     (should (equal (org-upcoming-modeline--format-ts  in1year now)   "31 Dec 2000, 10:00"))))
+
+(ert-deftest org-upcoming-modeline-format-time-without-seconds ()
+  "The default drops the seconds part, but keeps bare seconds."
+  (let* ((system-time-locale "C.UTF-8")
+         (org-upcoming-modeline-show-seconds nil)
+         (org-upcoming-modeline-duration-threshold 3600)
+         (now     (make-ts :hour 10 :minute 0 :second 0 :day 1 :month 1 :year 2000))
+         (past90s (ts-adjust 'second (- 90) now))
+         (in45s   (ts-adjust 'second 45 now))
+         (in90s   (ts-adjust 'second 90 now))
+         (in1hour (ts-adjust 'hour 1 now)))
+    (should (equal (org-upcoming-modeline--format-ts past90s now) "-1m"))
+    (should (equal (org-upcoming-modeline--format-ts in45s now)   "45s"))
+    (should (equal (org-upcoming-modeline--format-ts in90s now)   "1m"))
+    (should (equal (org-upcoming-modeline--format-ts in1hour now) "1h"))
+    (should (equal (org-upcoming-modeline--format-duration 3661)  "1h1m"))))
 
 (defun org-upcoming-modeline-test--span (start-h start-m end-h end-m)
   "Item (START END MARKER) for `org-upcoming-modeline--pick'.
